@@ -41,6 +41,7 @@ def _run_directory(config: dict, ticker: str, trade_date: str) -> Path:
     """
     return Path(config["results_dir"]) / safe_ticker_component(ticker) / trade_date
 
+
 def _announce_checkpoint_state(graph, ticker: str, trade_date: str) -> None:
     """Say whether this run resumed a saved one, where the user can see it.
 
@@ -53,6 +54,7 @@ def _announce_checkpoint_state(graph, ticker: str, trade_date: str) -> None:
         )
     else:
         message_buffer.add_message("System", f"Starting fresh for {ticker} on {trade_date}")
+
 
 def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
     """Assemble the run config from interactive selections, honoring env precedence.
@@ -90,6 +92,7 @@ def _build_run_config(selections: dict, checkpoint: bool | None) -> dict:
         config["checkpoint_enabled"] = checkpoint
     return config
 
+
 def run_analysis(checkpoint: bool | None = None, portfolio=None):
     # First get all user selections
     selections = get_user_selections()
@@ -125,6 +128,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None):
 
     def save_message_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             func(*args, **kwargs)
@@ -136,6 +140,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None):
 
     def save_tool_call_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             func(*args, **kwargs)
@@ -147,6 +152,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None):
 
     def save_report_section_decorator(obj, func_name):
         func = getattr(obj, func_name)
+
         @wraps(func)
         def wrapper(section_name, content):
             func(section_name, content)

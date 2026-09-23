@@ -42,6 +42,7 @@ def get_user_selections():
     save_last_run(selections)
     return selections
 
+
 def _prompt_selections(prefs):
     """Walk the selection steps. ``prefs`` prefills, the environment skips."""
     with open(Path(__file__).parent / "static" / "welcome.txt", encoding="utf-8") as f:
@@ -293,6 +294,7 @@ def _prompt_selections(prefs):
         "anthropic_effort": anthropic_effort,
         "output_language": output_language,
     }
+
 
 def get_analysis_date():
     """Get the analysis date from user input."""

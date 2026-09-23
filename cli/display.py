@@ -22,6 +22,7 @@ from tradingagents.graph.analyst_execution import (
 
 console = Console()
 
+
 class MessageBuffer:
     # Fixed teams that always run (not user-selectable)
     FIXED_AGENTS = {
@@ -152,7 +153,9 @@ class MessageBuffer:
                 f"### {section_titles[latest_section]}\n{latest_content}"
             )
 
+
 message_buffer = MessageBuffer()
+
 
 def create_layout():
     layout = Layout()
@@ -169,11 +172,13 @@ def create_layout():
     )
     return layout
 
+
 def format_tokens(n):
     """Format token count for display."""
     if n >= 1000:
         return f"{n/1000:.1f}k"
     return str(n)
+
 
 def update_display(layout, spinner_text=None, stats_handler=None, start_time=None):
     # Header with welcome message
@@ -370,6 +375,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 
     layout["footer"].update(Panel(stats_table, border_style="grey50"))
 
+
 def display_complete_report(final_state):
     """Display the complete analysis report sequentially (avoids truncation)."""
     console.print()
@@ -430,11 +436,13 @@ def display_complete_report(final_state):
             console.print(Panel("[bold]V. Portfolio Manager Decision[/bold]", border_style="green"))
             console.print(Panel(Markdown(risk["judge_decision"]), title="Portfolio Manager", border_style="blue", padding=(1, 2)))
 
+
 def update_research_team_status(status):
     """Update status for research team members (not Trader)."""
     research_team = ["Bull Researcher", "Bear Researcher", "Research Manager"]
     for agent in research_team:
         message_buffer.update_agent_status(agent, status)
+
 
 # Ordered list of analysts for status transitions
 ANALYST_ORDER = ["market", "social", "news", "fundamentals"]
@@ -452,6 +460,7 @@ ANALYST_REPORT_MAP = {
     "news": "news_report",
     "fundamentals": "fundamentals_report",
 }
+
 
 def update_analyst_statuses(message_buffer, chunk, wall_time_tracker=None):
     """Update analyst statuses based on accumulated report state.
@@ -500,6 +509,7 @@ def update_analyst_statuses(message_buffer, chunk, wall_time_tracker=None):
     ):
         message_buffer.update_agent_status("Bull Researcher", "in_progress")
 
+
 def extract_content_string(content):
     """Extract string content from various message formats.
     Returns None if no meaningful text content is found.
@@ -536,6 +546,7 @@ def extract_content_string(content):
 
     return str(content).strip() if not is_empty(content) else None
 
+
 def classify_message_type(message) -> tuple[str, str | None]:
     """Classify LangChain message into display type and extract content.
 
@@ -560,6 +571,7 @@ def classify_message_type(message) -> tuple[str, str | None]:
 
     # Fallback for unknown types
     return ("System", content)
+
 
 def format_tool_args(args, max_length=80) -> str:
     """Format tool arguments for terminal display."""
@@ -605,6 +617,7 @@ class AnalystWallTimeTracker:
         if not parts:
             return "Analyst wall time: pending"
         return "Analyst wall time: " + " | ".join(parts)
+
 
 def sync_analyst_tracker_from_chunk(
     tracker: AnalystWallTimeTracker,

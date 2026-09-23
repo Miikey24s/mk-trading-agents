@@ -76,7 +76,6 @@ def test_the_state_log_keeps_non_ascii_readable(tmp_path):
     assert json.loads(written)  # still valid JSON
 
 
-
 @pytest.mark.unit
 def test_the_live_display_does_not_scroll_the_terminal():
     """A layout taller than the window makes rich redraw by scrolling, which

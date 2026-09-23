@@ -88,6 +88,7 @@ def get_fundamentals(
     except Exception as e:
         raise NoMarketDataError(ticker, canonical, f"fundamentals unavailable: {e}") from e
 
+
 # This vendor dates a statement by the period it covers, not by the day it was
 # filed, and carries no filing date to do better. A company files weeks after its
 # period ends, so a run dated in that gap can be served figures that were not yet
@@ -97,6 +98,7 @@ _PERIOD_END_VINTAGE = (
     "# Periods are cut at the fiscal period end; this vendor does not report "
     "filing dates, so the most recent period may not have been published yet.\n\n"
 )
+
 
 def _statement(ticker, freq, curr_date, title, quarterly_attr, annual_attr) -> str:
     """One financial statement as CSV, cut at ``curr_date`` by period end."""
@@ -114,6 +116,7 @@ def _statement(ticker, freq, curr_date, title, quarterly_attr, annual_attr) -> s
     except Exception as e:
         raise NoMarketDataError(ticker, canonical, f"{what} unavailable: {e}") from e
 
+
 def get_balance_sheet(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
@@ -121,6 +124,7 @@ def get_balance_sheet(
 ):
     """Get balance sheet data from yfinance."""
     return _statement(ticker, freq, curr_date, "Balance Sheet", "quarterly_balance_sheet", "balance_sheet")
+
 
 def get_cashflow(
     ticker: Annotated[str, "ticker symbol of the company"],
@@ -130,6 +134,7 @@ def get_cashflow(
     """Get cash flow data from yfinance."""
     return _statement(ticker, freq, curr_date, "Cash Flow", "quarterly_cashflow", "cashflow")
 
+
 def get_income_statement(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
@@ -137,6 +142,7 @@ def get_income_statement(
 ):
     """Get income statement data from yfinance."""
     return _statement(ticker, freq, curr_date, "Income Statement", "quarterly_income_stmt", "income_stmt")
+
 
 # Rows are dated by the transaction, which is when the insider traded, not when
 # the market learned of it: a Form 4 is filed up to two business days later and
@@ -147,6 +153,7 @@ _TRANSACTION_DATE_VINTAGE = (
     "is filed, up to two business days later, so the newest rows may not have been "
     "known on this date.\n\n"
 )
+
 
 def get_insider_transactions(
     ticker: Annotated[str, "ticker symbol of the company"],
@@ -179,6 +186,7 @@ def get_insider_transactions(
 
     except Exception as e:
         raise NoMarketDataError(ticker, canonical, f"insider transactions unavailable: {e}") from e
+
 
 def get_company_profile(ticker: str) -> dict:
     """Yahoo's current profile for ``ticker``: name, sector, industry and the like."""
