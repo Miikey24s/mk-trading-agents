@@ -7,8 +7,8 @@ row omitted).
 import pandas as pd
 import pytest
 
-import tradingagents.dataflows.stockstats_utils as su
-import tradingagents.dataflows.y_finance as yfin
+import tradingagents.dataflows.vendors.yahoo.market as yfin
+import tradingagents.dataflows.vendors.yahoo.ohlcv as su
 from tradingagents.dataflows.config import set_config
 
 
