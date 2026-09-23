@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from cli import utils
+from cli import prompts as utils
 
 
 def _asks(value):

@@ -15,7 +15,7 @@ from tradingagents.llm_clients.api_key_env import PROVIDER_API_KEY_ENV, get_api_
 
 def test_every_select_llm_provider_choice_has_an_entry():
     """select_llm_provider() must not present a provider the mapping doesn't know about."""
-    # Mirrors the dropdown order in cli/utils.select_llm_provider so the two
+    # Mirrors the dropdown order in cli/prompts.select_llm_provider so the two
     # stay in lockstep. Region-specific keys (qwen-cn / minimax-cn / glm-cn)
     # are reached via the secondary region prompt, so they must also be present.
     expected = {
@@ -68,10 +68,10 @@ def test_case_insensitive_lookup():
 
 @pytest.fixture
 def cli_utils(monkeypatch):
-    """Import cli.utils with a fresh environment so module-level state is consistent."""
+    """Import cli.prompts with a fresh environment so module-level state is consistent."""
     import importlib
 
-    import cli.utils as cli_utils_module
+    import cli.prompts as cli_utils_module
     return importlib.reload(cli_utils_module)
 
 

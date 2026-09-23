@@ -1,10 +1,8 @@
 import unittest
 
+from cli.display import AnalystWallTimeTracker, sync_analyst_tracker_from_chunk
 from tradingagents.graph.analyst_execution import (
-    AnalystWallTimeTracker,
     build_analyst_execution_plan,
-    get_initial_analyst_node,
-    sync_analyst_tracker_from_chunk,
 )
 
 
@@ -20,14 +18,6 @@ class AnalystExecutionPlanTests(unittest.TestCase):
     def test_rejects_unknown_analyst_keys(self):
         with self.assertRaises(ValueError):
             build_analyst_execution_plan(["market", "macro"])
-
-    def test_get_initial_analyst_node_uses_plan_metadata(self):
-        plan = build_analyst_execution_plan(["fundamentals", "news"])
-
-        self.assertEqual(
-            get_initial_analyst_node(plan),
-            "Fundamentals Analyst",
-        )
 
     def test_social_key_displays_as_sentiment_analyst(self):
         # The wire key stays "social" for saved-config back-compat, but the

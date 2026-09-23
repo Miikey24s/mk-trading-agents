@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from cli.main import extract_content_string
+from cli.display import extract_content_string
 
 
 @pytest.mark.unit
