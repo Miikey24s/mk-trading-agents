@@ -1,0 +1,3 @@
+### Sentiment Analysis for AAPL
+- **Social Sentiment Score**: +0.68 (Moderately Bullish)
+- **Retail Chatter**: High discussion volume on AI infrastructure expansion.

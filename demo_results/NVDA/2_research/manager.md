@@ -1,0 +1,2 @@
+**Research Manager Synthesis:**
+The bull thesis retains fundamental dominance driven by verifiable order backlogs. However, near-term volatility warrants a disciplined entry strategy with strict stop-loss.
