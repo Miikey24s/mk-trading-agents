@@ -21,7 +21,11 @@ STALE = su.OHLCV_CACHE_TTL_SECONDS + 60
 def _write(tmp_path, name="AAPL-YFin-data.csv", age_seconds=0.0, last_date="2026-07-17"):
     f = tmp_path / name
     pd.DataFrame({"Date": [last_date], "Close": [100.0]}).to_csv(f, index=False)
-    written = NOW.timestamp() - age_seconds
+    # ``Timestamp.timestamp`` treats a naive timestamp as UTC while the cache
+    # helper's normal runtime uses the platform-local clock.  Convert through a
+    # stdlib datetime so this deterministic fixture has the same semantics as
+    # ``Timestamp.today()`` on every host timezone.
+    written = NOW.to_pydatetime().timestamp() - age_seconds
     os.utime(f, (written, written))
     return f
 
@@ -99,7 +103,20 @@ def test_one_cache_file_per_symbol_across_days(tmp_path, monkeypatch):
         monkeypatch.setattr(su.pd.Timestamp, "today", staticmethod(lambda now=now: now))
         su.load_ohlcv("AAPL", "2026-07-17")
         written = list(tmp_path.glob("AAPL-*.csv"))
-        os.utime(written[0], (now.timestamp(), now.timestamp()))
+        epoch = now.to_pydatetime().timestamp()
+        os.utime(written[0], (epoch, epoch))
 
     assert len(downloads) == 3, "each new day refetches"
     assert [p.name for p in tmp_path.iterdir()] == ["AAPL-YFin-data.csv"]
+
+
+@pytest.mark.unit
+def test_timezone_aware_now_preserves_cache_calendar_day(tmp_path):
+    """An aware clock must compare the mtime in that same timezone."""
+    now = pd.Timestamp("2026-07-18 12:00", tz="UTC")
+    f = tmp_path / "AAPL-YFin-data.csv"
+    pd.DataFrame({"Date": ["2026-07-17"], "Close": [100.0]}).to_csv(f, index=False)
+    written = (now - pd.Timedelta(seconds=60)).timestamp()
+    os.utime(f, (written, written))
+
+    assert su._cache_is_fresh(f, now.normalize(), now) is True

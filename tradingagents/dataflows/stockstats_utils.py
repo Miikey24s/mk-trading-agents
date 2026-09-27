@@ -187,10 +187,22 @@ def _cache_is_fresh(data_file, curr_date_dt, now) -> bool:
     whose ``Close`` is not the closing price, and row inspection cannot tell it
     from a final one (#1150).
     """
-    written = pd.Timestamp.fromtimestamp(os.path.getmtime(data_file))
+    # ``getmtime`` is an epoch value.  Preserve an explicitly supplied
+    # timezone when converting it; converting an aware ``now`` to a naive local
+    # timestamp first can move a cache written near midnight onto the wrong
+    # calendar day.  ``Timestamp.today()`` remains naive in the normal runtime,
+    # so retain the platform-local behavior for that path.
+    now = pd.Timestamp(now)
+    if now.tzinfo is None:
+        written = pd.Timestamp.fromtimestamp(os.path.getmtime(data_file))
+    else:
+        written = pd.Timestamp.fromtimestamp(
+            os.path.getmtime(data_file), tz="UTC"
+        ).tz_convert(now.tz)
     if written.date() != now.date():
         return False
-    return curr_date_dt.date() < now.date() or (now - written).total_seconds() <= OHLCV_CACHE_TTL_SECONDS
+    age_seconds = (now - written).total_seconds()
+    return curr_date_dt.date() < now.date() or age_seconds <= OHLCV_CACHE_TTL_SECONDS
 
 
 def load_ohlcv(symbol: str, curr_date: str, fill_gaps: bool = True) -> pd.DataFrame:
