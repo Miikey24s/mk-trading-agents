@@ -1,5 +1,7 @@
+import contextlib
 import logging
 import os
+import tempfile
 import time
 from typing import Annotated
 
@@ -205,6 +207,34 @@ def _cache_is_fresh(data_file, curr_date_dt, now) -> bool:
     return curr_date_dt.date() < now.date() or age_seconds <= OHLCV_CACHE_TTL_SECONDS
 
 
+def _write_ohlcv_cache(data: pd.DataFrame, data_file) -> None:
+    """Persist a downloaded frame without exposing a partially-written cache.
+
+    A process interruption during a direct ``to_csv(data_file)`` can leave a
+    non-empty CSV that passes the cache branch's shallow shape checks.  Write
+    beside the target, flush it to disk, then replace the target in one rename
+    operation so readers observe either the previous complete snapshot or the
+    new one.
+    """
+    data_file = os.fspath(data_file)
+    cache_dir = os.path.dirname(data_file) or "."
+    fd, temporary_file = tempfile.mkstemp(
+        prefix=f".{os.path.basename(data_file)}.",
+        suffix=".tmp",
+        dir=cache_dir,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as stream:
+            data.to_csv(stream, index=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_file, data_file)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary_file)
+        raise
+
+
 def load_ohlcv(symbol: str, curr_date: str, fill_gaps: bool = True) -> pd.DataFrame:
     """Fetch OHLCV data with caching, filtered to prevent look-ahead bias.
 
@@ -266,7 +296,7 @@ def load_ohlcv(symbol: str, curr_date: str, fill_gaps: bool = True) -> pd.DataFr
         # Only cache real data — never persist an empty frame.
         if downloaded.empty or "Close" not in downloaded.columns:
             raise_for_empty(symbol, canonical, "price rows")
-        downloaded.to_csv(data_file, index=False, encoding="utf-8")
+        _write_ohlcv_cache(downloaded, data_file)
         data = downloaded
 
     data = _clean_dataframe(data)
