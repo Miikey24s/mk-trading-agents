@@ -213,6 +213,51 @@ class TestCheckpointSignature(unittest.TestCase):
         g.config = {"max_debate_rounds": 1, "max_risk_discuss_rounds": 1}
         self.assertEqual(base, g._run_signature("stock"))
 
+    def test_run_signature_captures_llm_route_without_leaking_endpoint(self):
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+
+        g = object.__new__(TradingAgentsGraph)
+        g.selected_analysts = ("market", "news")
+        g.config = {
+            "max_debate_rounds": 1,
+            "max_risk_discuss_rounds": 1,
+            "llm_provider": "openai",
+            "deep_think_llm": "gpt-5.6",
+            "quick_think_llm": "gpt-5.6-luna",
+            "backend_url": "https://relay.invalid/v1?token=secret-value",
+            "temperature": 0.0,
+        }
+        base = g._run_signature("stock")
+
+        g.config["llm_provider"] = "ollama"
+        self.assertNotEqual(base, g._run_signature("stock"))
+        g.config["llm_provider"] = "openai"
+        g.config["quick_think_llm"] = "gpt-5.6"
+        self.assertNotEqual(base, g._run_signature("stock"))
+        g.config["quick_think_llm"] = "gpt-5.6-luna"
+        g.config["backend_url"] = "http://localhost:11434/v1"
+        changed_endpoint = g._run_signature("stock")
+        self.assertNotEqual(base, changed_endpoint)
+        self.assertNotIn("secret-value", base)
+        self.assertNotIn("relay.invalid", base)
+
+    def test_run_signature_is_stable_for_identical_llm_route(self):
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
+
+        g = object.__new__(TradingAgentsGraph)
+        g.selected_analysts = ("market",)
+        g.config = {
+            "max_debate_rounds": 1,
+            "max_risk_discuss_rounds": 1,
+            "llm_provider": "openai",
+            "deep_think_llm": "gpt-5.6",
+            "quick_think_llm": "gpt-5.6-luna",
+            "backend_url": None,
+        }
+        first = g._run_signature("stock")
+        second = g._run_signature("stock")
+        self.assertEqual(first, second)
+
 
 if __name__ == "__main__":
     unittest.main()

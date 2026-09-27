@@ -1,5 +1,6 @@
 # TradingAgents/graph/trading_graph.py
 
+import hashlib
 import json
 import logging
 import os
@@ -43,6 +44,44 @@ from .setup import GraphSetup
 from .signal_processing import SignalProcessor
 
 logger = logging.getLogger(__name__)
+
+
+# A checkpoint may contain provider-generated messages. Resuming it with a
+# different model or endpoint can silently mix two incompatible runs, which
+# is especially easy to do when moving from a hosted model to a local quota
+# fallback. Keep these inputs in one versioned, opaque fingerprint so the
+# checkpoint thread changes without leaking an endpoint or credential into the
+# filesystem key.
+_LLM_ROUTE_SIGNATURE_VERSION = "llm-route-v1"
+_LLM_ROUTE_SIGNATURE_KEYS = (
+    "llm_provider",
+    "deep_think_llm",
+    "quick_think_llm",
+    "backend_url",
+    "openai_reasoning_effort",
+    "google_thinking_level",
+    "anthropic_effort",
+    "temperature",
+    "llm_max_retries",
+    "max_tokens",
+)
+
+
+def _llm_route_fingerprint(config: dict[str, Any]) -> str:
+    """Return a stable opaque identity for model/provider run inputs.
+
+    The route is hashed rather than embedded in the checkpoint thread ID. In
+    particular, a custom URL may contain a token in its query string, and a
+    checkpoint identifier is routinely written to logs or SQLite metadata.
+    ``default=str`` keeps programmatic config values deterministic without
+    broadening the public config contract.
+    """
+    route = {
+        "version": _LLM_ROUTE_SIGNATURE_VERSION,
+        **{key: config.get(key) for key in _LLM_ROUTE_SIGNATURE_KEYS},
+    }
+    payload = json.dumps(route, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _validate_trade_date(trade_date) -> str:
@@ -421,8 +460,8 @@ class TradingAgentsGraph:
         """Graph-shape inputs that must invalidate a checkpoint if changed.
 
         Keyed into the checkpoint thread ID so a resume under a different analyst
-        selection, debate/risk depth, or asset mode starts fresh instead of
-        silently continuing the previous graph (#1089).
+        selection, debate/risk depth, asset mode, or LLM route starts fresh
+        instead of silently continuing the previous graph (#1089).
         """
         return "|".join([
             "analysts=" + ",".join(self.selected_analysts),
@@ -431,6 +470,10 @@ class TradingAgentsGraph:
             f"asset={asset_type}",
             # None, an empty book and a changed book are three different runs.
             f"portfolio={portfolio.fingerprint() if portfolio is not None else 'none'}",
+            # Provider/model/endpoint changes must never resume a checkpoint
+            # containing another model's messages. The digest is intentionally
+            # opaque; see _llm_route_fingerprint().
+            f"llm={_llm_route_fingerprint(self.config)}",
         ])
 
     def propagate(self, company_name, trade_date, asset_type: str = "stock", portfolio=None):

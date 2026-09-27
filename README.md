@@ -307,6 +307,13 @@ Checkpoint resume is opt-in via `--checkpoint`. When enabled, LangGraph saves st
 
 Per-ticker SQLite databases live at `~/.tradingagents/cache/checkpoints/<TICKER>.db` (override the base with `TRADINGAGENTS_CACHE_DIR`). Use `--clear-checkpoints` to reset all of them before a run.
 
+The checkpoint identity includes the selected analysts, debate/risk depth,
+asset type, portfolio fingerprint, and an opaque fingerprint of the provider,
+model pair, endpoint, and model-affecting runtime settings. Switching between a
+hosted model and a local Ollama/vLLM fallback therefore starts a fresh thread
+instead of mixing messages produced by different routes. The endpoint itself
+is never written into the thread identifier.
+
 ```bash
 tradingagents --checkpoint           # enable for this run
 tradingagents --clear-checkpoints    # reset before running
