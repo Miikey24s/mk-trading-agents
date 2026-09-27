@@ -6,6 +6,7 @@ CLI and ``TradingAgentsGraph.save_reports`` both call this, so a headless / API
 run produces the same on-disk report tree a CLI run does.
 """
 
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -15,6 +16,15 @@ def write_report_tree(final_state: dict, ticker: str, save_path) -> Path:
     save_path = Path(save_path)
     save_path.mkdir(parents=True, exist_ok=True)
     sections = []
+
+    # The manifest is machine-readable metadata, kept separate from free-form
+    # model prose so downstream tooling can validate it without parsing text.
+    provenance = final_state.get("run_provenance")
+    if provenance:
+        (save_path / "run_provenance.json").write_text(
+            json.dumps(provenance, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
 
     # 1. Analysts
     analysts_dir = save_path / "1_analysts"

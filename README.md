@@ -61,6 +61,13 @@
 
 TradingAgents is a multi-agent trading framework that mirrors the dynamics of real-world trading firms. By deploying specialized LLM-powered agents: from fundamental analysts, sentiment experts, and technical analysts, to trader, risk management team, the platform collaboratively evaluates market conditions and informs trading decisions. Moreover, these agents engage in dynamic discussions to pinpoint the optimal strategy.
 
+Completed runs also include a machine-readable `run_provenance.json` beside
+the report tree. It records the data cutoff, analyzed universe, asset type, an
+opaque model-route fingerprint, and a graph-configuration hash. Provider URLs
+and credentials are never written. The manifest is advisory metadata only and
+always declares `execution_capability: false`; sending an order remains outside
+this framework.
+
 <p align="center">
   <img src="assets/schema.png" style="width: 100%; height: auto;">
 </p>

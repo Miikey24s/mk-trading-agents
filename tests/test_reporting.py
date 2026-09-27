@@ -16,6 +16,16 @@ def _state():
         "investment_debate_state": {"judge_decision": "RM PLAN"},
         "trader_investment_plan": "TRADE",
         "risk_debate_state": {"judge_decision": "PM DECISION"},
+        "run_provenance": {
+            "schema_version": "tradingagents-run-provenance-v1",
+            "data_cutoff": "2026-09-01",
+            "universe": ["AAPL"],
+            "asset_type": "stock",
+            "route_fingerprint": "0123456789abcdef",
+            "graph_config_hash": "fedcba9876543210",
+            "execution_capability": False,
+            "mode": "advisory",
+        },
     }
 
 
@@ -28,6 +38,9 @@ def test_write_report_tree_creates_files(tmp_path):
     assert (tmp_path / "2_research" / "manager.md").read_text() == "RM PLAN"
     assert (tmp_path / "3_trading" / "trader.md").read_text() == "TRADE"
     assert (tmp_path / "5_portfolio" / "decision.md").read_text() == "PM DECISION"
+    manifest = (tmp_path / "run_provenance.json").read_text(encoding="utf-8")
+    assert '"execution_capability": false' in manifest
+    assert "0123456789abcdef" in manifest
     complete = out.read_text()
     assert "Trading Analysis Report: AAPL" in complete
     assert "MKT" in complete and "PM DECISION" in complete

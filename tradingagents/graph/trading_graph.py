@@ -35,6 +35,7 @@ from tradingagents.dataflows.utils import get_current_date, safe_ticker_componen
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
 from tradingagents.reporting import write_report_tree
+from tradingagents.run_provenance import build_run_provenance
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
 from .conditional_logic import ConditionalLogic
@@ -657,6 +658,19 @@ class TradingAgentsGraph:
         # Store current state for reflection.
         self.curr_state = final_state
 
+        # Keep a small, audit-safe manifest with every completed state.  The
+        # route is represented by the existing opaque fingerprint; endpoint and
+        # credential material never enters reports or full-state logs.
+        final_state["run_provenance"] = build_run_provenance(
+            ticker=company_name,
+            trade_date=str(trade_date),
+            asset_type=asset_type,
+            selected_analysts=self.selected_analysts,
+            config=self.config,
+            route_fingerprint=_llm_route_fingerprint(self.config),
+            portfolio_fingerprint=(portfolio.fingerprint() if portfolio is not None else "none"),
+        )
+
         # Log state to disk.
         self._log_state(trade_date, final_state)
 
@@ -697,6 +711,7 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            "run_provenance": final_state.get("run_provenance"),
         }
 
         # Save to file. Reject ticker values that would escape the
