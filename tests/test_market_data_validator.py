@@ -45,6 +45,30 @@ class TestVerifiedSnapshot:
         assert "Latest trading row used: 2026-05-15" in snap
         assert "Recent verified closes" in snap
 
+    def test_reapplies_cutoff_to_timezone_aware_provider_rows(self, monkeypatch):
+        # A direct provider/adapter may return aware timestamps even though the
+        # canonical loader normally normalizes them before this verification
+        # path.  The snapshot must keep the provider's local calendar date and
+        # exclude the future row without raising aware-vs-naive TypeError.
+        frame = pd.DataFrame({
+            "Date": [
+                "2026-05-07 09:30:00-04:00",
+                "2026-05-08 09:30:00-04:00",
+                "2026-05-09 09:30:00-04:00",
+            ],
+            "Open": [100.0, 101.0, 999.0],
+            "High": [101.0, 102.0, 999.0],
+            "Low": [99.0, 100.0, 999.0],
+            "Close": [100.5, 101.5, 999.0],
+            "Volume": [1_000_000, 1_000_000, 999],
+        })
+        monkeypatch.setattr(validator, "load_ohlcv", lambda s, d, fill_gaps=True: frame)
+
+        snap = validator.build_verified_market_snapshot("COF", "2026-05-08")
+
+        assert "Latest trading row used: 2026-05-08" in snap
+        assert "999.00" not in snap
+
     def test_raises_when_no_rows_on_or_before_date(self, monkeypatch):
         monkeypatch.setattr(validator, "load_ohlcv", lambda s, d, fill_gaps=True: _sample_ohlcv())
         with pytest.raises(ValueError):
