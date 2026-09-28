@@ -61,3 +61,13 @@ def test_save_reports_defaults_under_results_dir(tmp_path):
     assert out.exists()
     assert out.parent.parent.name == "reports"  # results_dir/reports/AAPL_<stamp>/...
     assert out.parent.name.startswith("AAPL_")
+
+
+@pytest.mark.unit
+def test_write_report_tree_rejects_invalid_provenance_before_writing(tmp_path):
+    state = _state()
+    state["run_provenance"]["execution_capability"] = True
+
+    with pytest.raises(ValueError, match="execution_capability"):
+        write_report_tree(state, "AAPL", tmp_path / "rejected")
+    assert not (tmp_path / "rejected").exists()

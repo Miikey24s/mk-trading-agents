@@ -10,16 +10,21 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from tradingagents.run_provenance import validate_run_provenance
+
 
 def write_report_tree(final_state: dict, ticker: str, save_path) -> Path:
     """Save a completed run's reports to ``save_path``; return the complete-report path."""
     save_path = Path(save_path)
-    save_path.mkdir(parents=True, exist_ok=True)
-    sections = []
-
     # The manifest is machine-readable metadata, kept separate from free-form
     # model prose so downstream tooling can validate it without parsing text.
     provenance = final_state.get("run_provenance")
+    if provenance:
+        validate_run_provenance(provenance, expected_ticker=ticker)
+
+    save_path.mkdir(parents=True, exist_ok=True)
+    sections = []
+
     if provenance:
         (save_path / "run_provenance.json").write_text(
             json.dumps(provenance, indent=2, ensure_ascii=False) + "\n",

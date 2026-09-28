@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import Any
 
 PROVENANCE_SCHEMA = "tradingagents-run-provenance-v1"
+_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{16}$")
 
 # Only values that affect the graph/research behavior and are safe to persist.
 # Endpoint, credentials, and vendor configuration are deliberately excluded.
@@ -68,4 +71,84 @@ def build_run_provenance(
         "execution_capability": False,
         "mode": "advisory",
     }
+
+
+def validate_run_provenance(
+    manifest: Mapping[str, Any], *, expected_ticker: str | None = None
+) -> None:
+    """Fail closed when a persisted run manifest breaks the provenance contract.
+
+    Reports are consumed by later review and replay tooling, so a malformed or
+    execution-capable manifest must never be written as if it were trusted
+    metadata.  The validator is deliberately deterministic: it validates the
+    canonical shape and safe scalar values without comparing against the wall
+    clock or a live provider.
+
+    ``expected_ticker`` is optional because callers may validate a manifest
+    before they know the report directory.  When supplied, it binds the
+    single-universe manifest to the report being written.
+    """
+    if not isinstance(manifest, Mapping):
+        raise ValueError("run_provenance must be a mapping")
+
+    required = {
+        "schema_version",
+        "data_cutoff",
+        "universe",
+        "asset_type",
+        "route_fingerprint",
+        "graph_config_hash",
+        "execution_capability",
+        "mode",
+    }
+    missing = sorted(required.difference(manifest))
+    if missing:
+        raise ValueError(f"run_provenance is missing required fields: {', '.join(missing)}")
+
+    if manifest["schema_version"] != PROVENANCE_SCHEMA:
+        raise ValueError(
+            f"unsupported run_provenance schema: {manifest['schema_version']!r}"
+        )
+
+    cutoff = manifest["data_cutoff"]
+    if not isinstance(cutoff, str):
+        raise ValueError("run_provenance.data_cutoff must be a YYYY-MM-DD string")
+    try:
+        canonical_cutoff = datetime.strptime(cutoff, "%Y-%m-%d").strftime("%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("run_provenance.data_cutoff must be a YYYY-MM-DD string") from exc
+    if cutoff != canonical_cutoff:
+        raise ValueError("run_provenance.data_cutoff must be canonical YYYY-MM-DD")
+
+    universe = manifest["universe"]
+    if isinstance(universe, (str, bytes)) or not isinstance(universe, Sequence) or not universe:
+        raise ValueError("run_provenance.universe must be a non-empty sequence")
+    for ticker in universe:
+        if not isinstance(ticker, str) or not ticker.strip() or ticker != ticker.strip():
+            raise ValueError("run_provenance.universe entries must be non-empty strings")
+        if any(ord(char) < 32 for char in ticker):
+            raise ValueError("run_provenance.universe entries must not contain control characters")
+    if expected_ticker is not None and (
+        len(universe) != 1 or universe[0] != str(expected_ticker).strip()
+    ):
+        raise ValueError("run_provenance.universe does not match the report ticker")
+
+    asset_type = manifest["asset_type"]
+    if not isinstance(asset_type, str) or not asset_type.strip() or asset_type != asset_type.strip():
+        raise ValueError("run_provenance.asset_type must be a non-empty string")
+
+    for field in ("route_fingerprint", "graph_config_hash"):
+        value = manifest[field]
+        if not isinstance(value, str) or not _FINGERPRINT_RE.fullmatch(value):
+            raise ValueError(f"run_provenance.{field} must be a 16-character lowercase hex digest")
+
+    if manifest["execution_capability"] is not False:
+        raise ValueError("run_provenance.execution_capability must remain false")
+    if manifest["mode"] != "advisory":
+        raise ValueError("run_provenance.mode must be advisory")
+
+    try:
+        json.dumps(manifest, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("run_provenance must be JSON-safe") from exc
 

@@ -1,6 +1,8 @@
 import json
 
-from tradingagents.run_provenance import build_run_provenance
+import pytest
+
+from tradingagents.run_provenance import build_run_provenance, validate_run_provenance
 
 
 def _build(config=None):
@@ -42,4 +44,35 @@ def test_graph_hash_changes_for_structural_config():
     first = _build()
     second = _build({"max_debate_rounds": 3, "max_risk_discuss_rounds": 2})
     assert first["graph_config_hash"] != second["graph_config_hash"]
+
+
+def test_validator_accepts_generated_manifest_and_binds_ticker():
+    validate_run_provenance(_build(), expected_ticker="AAPL")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("route_fingerprint", "not-a-digest"),
+        ("graph_config_hash", "0123456789ABCDEf"),
+        ("data_cutoff", "2026-9-1"),
+        ("mode", "execution"),
+    ],
+)
+def test_validator_rejects_unsafe_or_noncanonical_values(field, value):
+    manifest = _build()
+    manifest[field] = value
+    with pytest.raises(ValueError):
+        validate_run_provenance(manifest)
+
+
+def test_validator_rejects_execution_capability_and_ticker_mismatch():
+    manifest = _build()
+    manifest["execution_capability"] = True
+    with pytest.raises(ValueError, match="execution_capability"):
+        validate_run_provenance(manifest)
+
+    manifest = _build()
+    with pytest.raises(ValueError, match="does not match"):
+        validate_run_provenance(manifest, expected_ticker="MSFT")
 
