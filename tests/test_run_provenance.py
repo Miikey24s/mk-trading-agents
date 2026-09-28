@@ -25,6 +25,8 @@ def test_manifest_is_json_safe_and_declares_advisory_only():
     manifest = _build()
     json.dumps(manifest)
     assert manifest["schema_version"] == "tradingagents-run-provenance-v1"
+    assert len(manifest["run_id"]) == 16
+    assert set(manifest["run_id"]) <= set("0123456789abcdef")
     assert manifest["universe"] == ["AAPL"]
     assert manifest["data_cutoff"] == "2026-09-01"
     assert manifest["execution_capability"] is False
@@ -46,6 +48,21 @@ def test_graph_hash_changes_for_structural_config():
     assert first["graph_config_hash"] != second["graph_config_hash"]
 
 
+def test_run_id_is_stable_and_changes_with_run_identity():
+    first = _build()
+    assert first["run_id"] == _build()["run_id"]
+
+    changed_date = build_run_provenance(
+        ticker="AAPL",
+        trade_date="2026-09-02",
+        asset_type="stock",
+        selected_analysts=("market", "news"),
+        config={"max_debate_rounds": 1, "max_risk_discuss_rounds": 2},
+        route_fingerprint="0123456789abcdef",
+    )
+    assert changed_date["run_id"] != first["run_id"]
+
+
 def test_validator_accepts_generated_manifest_and_binds_ticker():
     validate_run_provenance(_build(), expected_ticker="AAPL")
 
@@ -53,6 +70,7 @@ def test_validator_accepts_generated_manifest_and_binds_ticker():
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("run_id", "not-a-digest"),
         ("route_fingerprint", "not-a-digest"),
         ("graph_config_hash", "0123456789ABCDEf"),
         ("data_cutoff", "2026-9-1"),

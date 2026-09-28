@@ -61,8 +61,24 @@ def build_run_provenance(
     graph_config["selected_analysts"] = list(selected_analysts)
     graph_config["asset_type"] = str(asset_type)
     graph_config["portfolio_fingerprint"] = str(portfolio_fingerprint)
+    # Keep one stable logical-run identity across a restart.  This is useful
+    # for unattended recovery and report reconciliation: a resumed checkpoint
+    # must map back to the same input contract even when the process restarts.
+    # It is deliberately derived only from safe, already-opaque fingerprints;
+    # provider URLs and credentials never enter the receipt.
+    run_id = _stable_hash(
+        {
+            "schema_version": PROVENANCE_SCHEMA,
+            "data_cutoff": str(trade_date),
+            "ticker": str(ticker).strip(),
+            "asset_type": str(asset_type),
+            "route_fingerprint": str(route_fingerprint),
+            "graph_config_hash": _stable_hash(graph_config),
+        }
+    )
     return {
         "schema_version": PROVENANCE_SCHEMA,
+        "run_id": run_id,
         "data_cutoff": str(trade_date),
         "universe": [str(ticker).strip()],
         "asset_type": str(asset_type),
@@ -109,6 +125,17 @@ def validate_run_provenance(
         raise ValueError(
             f"unsupported run_provenance schema: {manifest['schema_version']!r}"
         )
+
+    # ``run_id`` was added without changing the schema version so older
+    # persisted manifests remain readable.  New manifests always include it;
+    # when present, keep it constrained to the same opaque digest contract as
+    # the route/config fingerprints.
+    if "run_id" in manifest:
+        run_id = manifest["run_id"]
+        if not isinstance(run_id, str) or not _FINGERPRINT_RE.fullmatch(run_id):
+            raise ValueError(
+                "run_provenance.run_id must be a 16-character lowercase hex digest"
+            )
 
     cutoff = manifest["data_cutoff"]
     if not isinstance(cutoff, str):

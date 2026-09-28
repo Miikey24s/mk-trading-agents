@@ -66,8 +66,10 @@ the report tree. It records the data cutoff, analyzed universe, asset type, an
 opaque model-route fingerprint, and a graph-configuration hash. Provider URLs
 and credentials are never written. The manifest is advisory metadata only and
 always declares `execution_capability: false`; the report writer validates that
-contract and refuses malformed or execution-capable manifests. Sending an order
-remains outside this framework.
+contract and refuses malformed or execution-capable manifests. New manifests
+also carry a stable `run_id` derived from the input contract, so a resumed
+checkpoint can be reconciled with its completed report after a process restart.
+Sending an order remains outside this framework.
 
 <p align="center">
   <img src="assets/schema.png" style="width: 100%; height: auto;">
