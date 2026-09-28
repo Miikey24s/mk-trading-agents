@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.reporting import write_report_tree
+from tradingagents.reporting import _atomic_write_text, write_report_tree
 
 
 def _state():
@@ -27,6 +27,23 @@ def _state():
             "mode": "advisory",
         },
     }
+
+
+@pytest.mark.unit
+def test_atomic_write_replaces_destination_and_cleans_failed_temp(tmp_path, monkeypatch):
+    destination = tmp_path / "artifact.md"
+    _atomic_write_text(destination, "complete")
+    assert destination.read_text(encoding="utf-8") == "complete"
+    assert not list(tmp_path.glob(".artifact.md.*.tmp"))
+
+    def fail_replace(*args):
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr("tradingagents.reporting.os.replace", fail_replace)
+    with pytest.raises(OSError, match="interruption"):
+        _atomic_write_text(destination, "partial")
+    assert destination.read_text(encoding="utf-8") == "complete"
+    assert not list(tmp_path.glob(".artifact.md.*.tmp"))
 
 
 @pytest.mark.unit
