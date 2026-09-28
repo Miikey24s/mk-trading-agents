@@ -66,6 +66,41 @@ def test_the_state_log_keeps_non_ascii_readable(tmp_path):
 
 
 @pytest.mark.unit
+def test_state_log_replace_failure_keeps_previous_json(tmp_path, monkeypatch):
+    """An interrupted state write must not publish a truncated recovery log."""
+    from tradingagents.graph.trading_graph import TradingAgentsGraph
+
+    graph = object.__new__(TradingAgentsGraph)
+    graph.config = {"results_dir": str(tmp_path)}
+    graph.ticker = "AAPL"
+    graph.log_states_dict = {}
+    state = {
+        "company_of_interest": "AAPL", "trade_date": "2026-09-01",
+        "market_report": "MKT", "sentiment_report": "SENT", "news_report": "NEWS",
+        "fundamentals_report": "FUND", "investment_plan": "PLAN",
+        "trader_investment_plan": "TRADE", "final_trade_decision": "Hold",
+        "investment_debate_state": {"bull_history": "", "bear_history": "",
+                                    "history": "", "current_response": "",
+                                    "judge_decision": ""},
+        "risk_debate_state": {"aggressive_history": "", "conservative_history": "",
+                              "neutral_history": "", "history": "", "judge_decision": ""},
+    }
+    log_path = tmp_path / "AAPL" / "TradingAgentsStrategy_logs" / "full_states_log_2026-09-01.json"
+    log_path.parent.mkdir(parents=True)
+    log_path.write_text("previous", encoding="utf-8")
+
+    def fail_replace(*args):
+        raise OSError("simulated interruption")
+
+    monkeypatch.setattr("tradingagents.reporting.os.replace", fail_replace)
+    with pytest.raises(OSError, match="interruption"):
+        graph._log_state("2026-09-01", state)
+
+    assert log_path.read_text(encoding="utf-8") == "previous"
+    assert not list(log_path.parent.glob(".full_states_log_2026-09-01.json.*.tmp"))
+
+
+@pytest.mark.unit
 def test_the_live_display_does_not_scroll_the_terminal():
     """A layout taller than the window makes rich redraw by scrolling, which
     reads as flicker; the alternate screen holds it in place (#784). The final

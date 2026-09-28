@@ -35,7 +35,7 @@ from tradingagents.dataflows.config import set_config
 from tradingagents.dataflows.utils import get_current_date, safe_ticker_component
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients import create_llm_client
-from tradingagents.reporting import write_report_tree
+from tradingagents.reporting import _atomic_write_text, write_report_tree
 from tradingagents.run_provenance import build_run_provenance
 
 from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
@@ -739,9 +739,14 @@ class TradingAgentsGraph:
         directory.mkdir(parents=True, exist_ok=True)
 
         log_path = directory / f"full_states_log_{trade_date}.json"
-        with open(log_path, "w", encoding="utf-8") as f:
-            # Reports can be in any language and this file is read by a person.
-            json.dump(self.log_states_dict[str(trade_date)], f, indent=4, ensure_ascii=False)
+        # State logs are the recovery/audit input for later runs.  Write them
+        # through the same-filesystem atomic primitive as reports so a
+        # host interruption cannot leave a truncated JSON file that looks like
+        # a completed state.
+        content = json.dumps(
+            self.log_states_dict[str(trade_date)], indent=4, ensure_ascii=False
+        )
+        _atomic_write_text(log_path, content)
 
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""
