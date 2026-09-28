@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import math
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -130,6 +131,23 @@ def _coerce_max_tokens(value):
     return n
 
 
+def _coerce_temperature(value):
+    """Validate a finite, non-negative sampling temperature.
+
+    Providers may apply a tighter upper bound, but accepting NaN or infinity
+    here would defer a malformed unattended run to an opaque SDK request.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"temperature must be a number, not a boolean: {value!r}")
+    try:
+        n = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"temperature must be a number, got {value!r}") from exc
+    if not math.isfinite(n) or n < 0:
+        raise ValueError(f"temperature must be a finite number >= 0, got {value!r}")
+    return n
+
+
 class TradingAgentsGraph:
     """Main class that orchestrates the trading agents framework."""
 
@@ -244,7 +262,7 @@ class TradingAgentsGraph:
         # string ("0.2") works the same as a programmatic float.
         temperature = self.config.get("temperature")
         if temperature is not None and temperature != "":
-            kwargs["temperature"] = float(temperature)
+            kwargs["temperature"] = _coerce_temperature(temperature)
 
         # SDK retry budget is cross-provider. Forward it only when explicitly set
         # so each provider keeps its own default (usually 2) otherwise (#1091).

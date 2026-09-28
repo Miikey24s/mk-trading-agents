@@ -365,6 +365,10 @@ Live data moves. News, StockTwits, and Reddit return different content as time p
 
 To reduce variation you can lower the sampling temperature. Set `temperature` in your config (or `TRADINGAGENTS_TEMPERATURE` in `.env`); lower values make models that honor it more repeatable. The current curated models are reasoning-first and largely ignore temperature, so for tighter reproducibility name a non-reasoning model in your config, or in `TRADINGAGENTS_DEEP_THINK_LLM` and `TRADINGAGENTS_QUICK_THINK_LLM`. Any model ID your provider serves is accepted, whether or not the picker lists it.
 
+Temperature values must be finite and non-negative; malformed values such as
+`NaN`, infinity, booleans, or negative numbers fail before an unattended run
+can reach a provider SDK.
+
 ```python
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"] = "openai"

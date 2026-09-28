@@ -81,3 +81,16 @@ class TestProviderKwargsTemperature:
 
     def test_empty_string_omitted(self):
         assert "temperature" not in self._kwargs_for("")
+
+    @pytest.mark.parametrize("bad", [True, False, -0.1, "nan", "inf", "-inf", "not-a-number"])
+    def test_invalid_temperature_fails_closed(self, bad):
+        with pytest.raises(ValueError, match="temperature"):
+            self._kwargs_for(bad)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value, expected", [(0, 0.0), ("0.25", 0.25), (2, 2.0)])
+def test_coerce_temperature_accepts_finite_non_negative_values(value, expected):
+    from tradingagents.graph.trading_graph import _coerce_temperature
+
+    assert _coerce_temperature(value) == expected
