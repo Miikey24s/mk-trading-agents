@@ -19,13 +19,13 @@ def write_report_tree(final_state: dict, ticker: str, save_path) -> Path:
     # The manifest is machine-readable metadata, kept separate from free-form
     # model prose so downstream tooling can validate it without parsing text.
     provenance = final_state.get("run_provenance")
-    if provenance:
+    if provenance is not None:
         validate_run_provenance(provenance, expected_ticker=ticker)
 
     save_path.mkdir(parents=True, exist_ok=True)
     sections = []
 
-    if provenance:
+    if provenance is not None:
         (save_path / "run_provenance.json").write_text(
             json.dumps(provenance, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",

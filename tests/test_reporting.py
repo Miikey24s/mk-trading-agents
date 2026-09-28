@@ -71,3 +71,8 @@ def test_write_report_tree_rejects_invalid_provenance_before_writing(tmp_path):
     with pytest.raises(ValueError, match="execution_capability"):
         write_report_tree(state, "AAPL", tmp_path / "rejected")
     assert not (tmp_path / "rejected").exists()
+
+    state["run_provenance"] = {}
+    with pytest.raises(ValueError, match="missing required fields"):
+        write_report_tree(state, "AAPL", tmp_path / "empty")
+    assert not (tmp_path / "empty").exists()
