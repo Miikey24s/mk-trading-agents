@@ -36,6 +36,27 @@ def _stable_hash(value: Mapping[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
+def _run_identity(
+    *,
+    ticker: str,
+    data_cutoff: str,
+    asset_type: str,
+    route_fingerprint: str,
+    graph_config_hash: str,
+) -> str:
+    """Return the canonical logical-run identity from safe manifest fields."""
+    return _stable_hash(
+        {
+            "schema_version": PROVENANCE_SCHEMA,
+            "data_cutoff": str(data_cutoff),
+            "ticker": str(ticker).strip(),
+            "asset_type": str(asset_type),
+            "route_fingerprint": str(route_fingerprint),
+            "graph_config_hash": str(graph_config_hash),
+        }
+    )
+
+
 def build_run_provenance(
     *,
     ticker: str,
@@ -66,15 +87,13 @@ def build_run_provenance(
     # must map back to the same input contract even when the process restarts.
     # It is deliberately derived only from safe, already-opaque fingerprints;
     # provider URLs and credentials never enter the receipt.
-    run_id = _stable_hash(
-        {
-            "schema_version": PROVENANCE_SCHEMA,
-            "data_cutoff": str(trade_date),
-            "ticker": str(ticker).strip(),
-            "asset_type": str(asset_type),
-            "route_fingerprint": str(route_fingerprint),
-            "graph_config_hash": _stable_hash(graph_config),
-        }
+    graph_config_hash = _stable_hash(graph_config)
+    run_id = _run_identity(
+        ticker=str(ticker).strip(),
+        data_cutoff=str(trade_date),
+        asset_type=str(asset_type),
+        route_fingerprint=str(route_fingerprint),
+        graph_config_hash=graph_config_hash,
     )
     return {
         "schema_version": PROVENANCE_SCHEMA,
@@ -83,7 +102,7 @@ def build_run_provenance(
         "universe": [str(ticker).strip()],
         "asset_type": str(asset_type),
         "route_fingerprint": str(route_fingerprint),
-        "graph_config_hash": _stable_hash(graph_config),
+        "graph_config_hash": graph_config_hash,
         "execution_capability": False,
         "mode": "advisory",
     }
@@ -168,6 +187,21 @@ def validate_run_provenance(
         value = manifest[field]
         if not isinstance(value, str) or not _FINGERPRINT_RE.fullmatch(value):
             raise ValueError(f"run_provenance.{field} must be a 16-character lowercase hex digest")
+
+    if "run_id" in manifest:
+        if len(universe) != 1:
+            raise ValueError(
+                "run_provenance.run_id requires exactly one universe entry"
+            )
+        expected_run_id = _run_identity(
+            ticker=universe[0],
+            data_cutoff=cutoff,
+            asset_type=asset_type,
+            route_fingerprint=manifest["route_fingerprint"],
+            graph_config_hash=manifest["graph_config_hash"],
+        )
+        if manifest["run_id"] != expected_run_id:
+            raise ValueError("run_provenance.run_id does not match its input contract")
 
     if manifest["execution_capability"] is not False:
         raise ValueError("run_provenance.execution_capability must remain false")

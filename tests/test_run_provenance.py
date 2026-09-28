@@ -94,3 +94,17 @@ def test_validator_rejects_execution_capability_and_ticker_mismatch():
     with pytest.raises(ValueError, match="does not match"):
         validate_run_provenance(manifest, expected_ticker="MSFT")
 
+
+def test_validator_rejects_run_id_that_does_not_match_manifest_inputs():
+    manifest = _build()
+    manifest["run_id"] = "0123456789abcdef"
+    with pytest.raises(ValueError, match="run_id does not match"):
+        validate_run_provenance(manifest, expected_ticker="AAPL")
+
+
+def test_validator_rejects_run_id_on_multi_universe_manifest():
+    manifest = _build()
+    manifest["universe"] = ["AAPL", "MSFT"]
+    with pytest.raises(ValueError, match="exactly one universe"):
+        validate_run_provenance(manifest)
+
