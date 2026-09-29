@@ -1,5 +1,6 @@
 """Append-only markdown decision log for TradingAgents."""
 
+import os
 import re
 from pathlib import Path
 
@@ -48,8 +49,12 @@ class TradingMemoryLog:
         rating = parse_rating(final_trade_decision)
         tag = f"[{trade_date} | {ticker} | {rating} | pending]"
         entry = f"{tag}\n\nDECISION:\n{final_trade_decision}{self._SEPARATOR}"
-        with open(self._log_path, "a", encoding="utf-8") as f:
-            f.write(entry)
+        # A decision is the first durable state of a run.  Appending directly
+        # can leave a truncated markdown entry after a process interruption;
+        # write the complete old+new document beside the destination and then
+        # replace it atomically, matching the outcome-update path below.
+        existing = self._log_path.read_text(encoding="utf-8") if self._log_path.exists() else ""
+        self._atomic_write(existing + entry)
 
     # --- Read path (Phase A) ---
 
@@ -173,9 +178,7 @@ class TradingMemoryLog:
 
         new_blocks = self._apply_rotation(new_blocks)
         new_text = self._SEPARATOR.join(new_blocks)
-        tmp_path = self._log_path.with_suffix(".tmp")
-        tmp_path.write_text(new_text, encoding="utf-8")
-        tmp_path.replace(self._log_path)
+        self._atomic_write(new_text)
 
     def batch_update_with_outcomes(self, updates: list[dict]) -> None:
         """Apply multiple outcome updates in a single read + atomic write.
@@ -227,11 +230,29 @@ class TradingMemoryLog:
 
         new_blocks = self._apply_rotation(new_blocks)
         new_text = self._SEPARATOR.join(new_blocks)
-        tmp_path = self._log_path.with_suffix(".tmp")
-        tmp_path.write_text(new_text, encoding="utf-8")
-        tmp_path.replace(self._log_path)
+        self._atomic_write(new_text)
 
     # --- Helpers ---
+
+    def _atomic_write(self, text: str) -> None:
+        """Durably publish the complete log while preserving the old file on failure.
+
+        The temporary path intentionally remains ``<log>.tmp`` for compatibility
+        with the existing cleanup/diagnostic contract.  It is always removed in
+        ``finally``; ``os.replace`` is same-filesystem atomic on Windows and
+        POSIX, so readers see either the previous complete log or the new one.
+        """
+        if self._log_path is None:
+            return
+        tmp_path = self._log_path.with_suffix(".tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8", newline="") as handle:
+                handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, self._log_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
     @staticmethod
     def _resolved_tag(

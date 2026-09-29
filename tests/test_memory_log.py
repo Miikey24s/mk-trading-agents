@@ -153,6 +153,22 @@ class TestTradingMemoryLogCore:
         assert len(entries) == 1
         assert entries[0]["pending"] is False  # the settled record is kept, not replaced
 
+    def test_store_replace_failure_keeps_previous_log(self, tmp_path, monkeypatch):
+        """An interrupted first-phase write must not publish a partial entry."""
+        log = make_log(tmp_path)
+        log.store_decision("NVDA", "2026-01-10", DECISION_BUY)
+        previous = (tmp_path / "trading_memory.md").read_text(encoding="utf-8")
+
+        def fail_replace(*args):
+            raise OSError("simulated interruption")
+
+        monkeypatch.setattr("tradingagents.agents.utils.memory.os.replace", fail_replace)
+        with pytest.raises(OSError, match="interruption"):
+            log.store_decision("AAPL", "2026-01-11", DECISION_OVERWEIGHT)
+
+        assert (tmp_path / "trading_memory.md").read_text(encoding="utf-8") == previous
+        assert not (tmp_path / "trading_memory.tmp").exists()
+
     def test_batch_update_resolves_multiple_entries(self, tmp_path):
         """batch_update_with_outcomes resolves multiple pending entries in one write."""
         log = make_log(tmp_path)
@@ -462,6 +478,24 @@ class TestDeferredReflection:
         assert len(entries) == 1
         assert entries[0]["reflection"] == "Correct."
         assert entries[0]["pending"] is False
+
+    def test_update_replace_failure_keeps_previous_log(self, tmp_path, monkeypatch):
+        """A failed outcome publication leaves the pending decision recoverable."""
+        log = make_log(tmp_path)
+        log.store_decision("NVDA", "2026-01-10", DECISION_BUY)
+        previous = (tmp_path / "trading_memory.md").read_text(encoding="utf-8")
+
+        def fail_replace(*args):
+            raise OSError("simulated interruption")
+
+        monkeypatch.setattr("tradingagents.agents.utils.memory.os.replace", fail_replace)
+        with pytest.raises(OSError, match="interruption"):
+            log.update_with_outcome(
+                "NVDA", "2026-01-10", 0.042, 0.021, 5, "Correct."
+            )
+
+        assert (tmp_path / "trading_memory.md").read_text(encoding="utf-8") == previous
+        assert not (tmp_path / "trading_memory.tmp").exists()
 
     def test_update_noop_when_no_log_path(self):
         log = TradingMemoryLog(config=None)
